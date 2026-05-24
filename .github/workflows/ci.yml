@@ -1,0 +1,33 @@
+name: nu_tip_ci
+
+on:
+  push:
+    branches: [ master ] # master - u nas rabstvo cho li
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: |
+          docker build -t devops-lab-service:test -f docker/Dockerfile .
+
+      - name: Run container and test health
+        run: |
+          docker run -d --name test-container -p 8000:8000 devops-lab-service:test
+
+          sleep 5
+
+          curl -f http://localhost:8000/ || exit 1
+
+          curl -f http://localhost:8000/metrics || exit 1
+
+          docker stop test-container
+          docker rm test-container
+
