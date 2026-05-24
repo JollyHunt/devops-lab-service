@@ -1,1 +1,9 @@
-# TODO: настроить сбор метрик
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'lab4-hihihaha'
+    static_configs:
+      - targets: ['lab4-hihihaha:8000']
+    metrics_path: '/metrics'
