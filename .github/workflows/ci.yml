@@ -37,9 +37,12 @@ jobs:
       - name: Install sshpass
         run: sudo apt-get install -y sshpass
 
-      - name: Copy files
+      - name: Copy files to VM via SCP
         run: |
-          sshpass -p '${{ secrets.SSH_USER_PASSWORD }}' scp -o StrictHostKeyChecking=no -r ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.PROJECT_PATH }}/
+          sshpass -p '${{ secrets.SSH_PASSWORD }}' \
+            scp -o StrictHostKeyChecking=no \
+            -r ./ \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.PROJECT_PATH }}/
 
       - name: deploy_na_vm
         run: |
