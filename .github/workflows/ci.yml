@@ -3,61 +3,41 @@ name: nu_tip_ci
 on:
   push:
     branches: [ master ]
-  pull_request:
-    branches: [ master ]
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: build
-        run: |
-          docker build -t devops-lab-service:test -f docker/Dockerfile .
+      - name: Build image
+        run: docker build -t devops-lab-service:test -f docker/Dockerfile .
 
-      - name: test
+      - name: Test container
         run: |
           docker run -d --name test-container -p 8000:8000 devops-lab-service:test
           sleep 5
-
           curl -f http://localhost:8000/ || exit 1
           curl -f http://localhost:8000/metrics || exit 1
-
-          docker stop test-container
-          docker rm test-container
+          docker stop test-container && docker rm test-container
 
   deploy:
     needs: build-and-test
     runs-on: ubuntu-latest
-
+    if: github.ref == 'refs/heads/master'
     steps:
-      - name: Install sshpass
-        run: sudo apt-get install -y sshpass
-
-      - name: Copy files to VM via SCP
+      - name: ssh_try
         run: |
-          sshpass -p '${{ secrets.SSH_PASSWORD }}' \
-            scp -o StrictHostKeyChecking=no \
-            -r ./ \
-            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.PROJECT_PATH }}/
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT }} >> ~/.ssh/known_hosts
 
-      - name: deploy_na_vm
+      - name: deploy_v_vm
         run: |
-          sshpass -p '${{ secrets.SSH_USER_PASSWORD }}' ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
-            set -e
-
+          ssh -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << EOF
             cd ${{ secrets.PROJECT_PATH }}
-
             git pull master
-
             docker compose -f docker/docker-compose.yml down
             docker compose -f docker/docker-compose.yml up -d --build
-            sleep 5
-
-            curl -f http://localhost:8000/ || exit 1
-            curl -f http://localhost:8000/metrics || exit 1
           EOF
-
